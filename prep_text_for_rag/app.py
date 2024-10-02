@@ -1,9 +1,6 @@
 from dotenv import load_dotenv
 import os
 from langchain_community.graphs import Neo4jGraph
-
-
-from langchain_community.graphs import Neo4jGraph
 from langchain_openai import ChatOpenAI
 
 load_dotenv()
@@ -15,8 +12,8 @@ NEO4J_PASSWORD = os.environ["NEO4J_PASSWORD"]
 NEO4J_DATABASE = os.environ["NEO4J_DATABASE"]
 AUTH = (NEO4J_USERNAME, NEO4J_PASSWORD)
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_ENDPOINT = os.getenv("OPENAI_ENDPOINT")
+OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+OPENAI_ENDPOINT = os.environ["OPENAI_ENDPOINT"]
 
 chat = ChatOpenAI(api_key=OPENAI_API_KEY)
 
@@ -27,6 +24,8 @@ kg = Neo4jGraph(
     password=NEO4J_PASSWORD,
     database=NEO4J_DATABASE,
 )
+
+
 
 # kg.query(
 #     """
@@ -49,40 +48,46 @@ kg = Neo4jGraph(
 # )
 # print(res)
 
-# kg.query(
-#     """
-#     MATCH (hp:HealthcareProvider)-[:TREATS]->(p:Patient)
-#     WHERE hp.bio IS NOT NULL
-#     WITH hp, genai.vector.encode(
-#         hp.bio,
-#         "OpenAI",
-#         {
-#           token: $openAiApiKey,
-#           endpoint: $openAiEndpoint
-#         }) AS vector
-#     WITH hp, vector
-#     WHERE vector IS NOT NULL
-#     CALL db.create.setNodeVectorProperty(hp, "comprehensiveEmbedding", vector)
-#     """,
-#     params={
-#         "openAiApiKey": OPENAI_API_KEY,
-#         "openAiEndpoint": OPENAI_ENDPOINT,
-#     },
-# )
+kg.query(
+    """
+    MATCH (hp:HealthcareProvider)-[:TREATS]->(p:Patient)
+    WHERE hp.bio IS NOT NULL
+    WITH hp, genai.vector.encode(
+        hp.bio,
+        "OpenAI",
+        {
+          token: $openAiApiKey,
+          endpoint: $openAiEndpoint
+        }) AS vector
+    WITH hp, vector
+    WHERE vector IS NOT NULL
+    CALL db.create.setNodeVectorProperty(hp, "comprehensiveEmbedding", vector)
+    """,
+    params={
+        "openAiApiKey": OPENAI_API_KEY,
+        "openAiEndpoint": OPENAI_ENDPOINT,
+    },
+)
 
-# result = kg.query(
-#     """
-#     MATCH (hp:HealthcareProvider)
-#     WHERE hp.bio IS NOT NULL
-#     RETURN hp.bio, hp.name, hp.comprehensiveEmbedding
-#     LIMIT 5
-#     """
-# )
-# # loop through the results
-# for record in result:
-#     print(f" bio: {record["hp.bio"]}, name: {record["hp.name"]}")
+print("\n----------------------------- QUERY TEST -----------------------------\n")
 
-# == Queerying the graph for a healthcare provider
+result = kg.query(
+    """
+    MATCH (hp:HealthcareProvider)
+    WHERE hp.bio IS NOT NULL
+    RETURN hp.bio, hp.name, hp.comprehensiveEmbedding
+    LIMIT 5
+    """
+)
+# loop through the results
+for record in result:
+    # print(record.keys())
+    print(f" bio: {record['hp.bio']}, name: {record['hp.name']}")
+
+print("\n----------------------------- END TEST -----------------------------\n")
+print("----------------------------- BEGIN INDEXING SEARCH -----------------------------")
+
+# # == Queerying the graph for a healthcare provider
 question = "give me a list of healthcare providers in the area of dermatology"
 
 # # Execute the query
@@ -121,3 +126,6 @@ for record in result:
     # print(f"Location: {record['healthcare_provider.location']}")
     print(f"Score: {record['score']}")
     print("---")
+
+## https://stackoverflow.com/questions/76024415/neomodel-aura-db-exception-ignored-in-function-bolt-del-at-0x7f1fe646
+kg._driver.close() 
