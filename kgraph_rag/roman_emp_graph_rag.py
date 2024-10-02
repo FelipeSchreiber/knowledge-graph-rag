@@ -10,7 +10,7 @@ from langchain_core.runnables import (
 )
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.prompt import PromptTemplate
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from typing import Tuple, List
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
@@ -52,6 +52,7 @@ kg = Neo4jGraph(
     database=NEO4J_DATABASE,
 )
 
+"""
 # # read the wikipedia page for the Roman Empire
 raw_documents = WikipediaLoader(query="The Roman empire").load()
 
@@ -59,7 +60,7 @@ raw_documents = WikipediaLoader(query="The Roman empire").load()
 # # # # Define chunking strategy
 text_splitter = TokenTextSplitter(chunk_size=512, chunk_overlap=24)
 documents = text_splitter.split_documents(raw_documents[:3])
-print(documents)
+#print(documents)
 
 llm_transformer = LLMGraphTransformer(llm=chat)
 graph_documents = llm_transformer.convert_to_graph_documents(documents)
@@ -70,7 +71,7 @@ res = kg.add_graph_documents(
     include_source=True,
     baseEntityLabel=True,
 )
-
+"""
 
 # Hybrid Retrieval for RAG
 # create vector index
@@ -110,11 +111,13 @@ prompt = ChatPromptTemplate.from_messages(
 entity_chain = prompt | chat.with_structured_output(Entities)
 
 # Test it out:
-# res = entity_chain.invoke(
-#     {"question": "In the year of 123 there was an emperor who did not like to rule."}
-# ).names
-# # print(res)
+res = entity_chain.invoke(
+    {"question": "In the year of 123 there was an emperor who did not like to rule."}
+).names
+# print(res)
 
+#kg._driver.close() 
+#exit(0)
 # Retriever
 kg.query("CREATE FULLTEXT INDEX entity IF NOT EXISTS FOR (e:__Entity__) ON EACH [e.id]")
 
@@ -150,7 +153,7 @@ def structured_retriever(question: str) -> str:
         response = kg.query(
             """CALL db.index.fulltext.queryNodes('entity', $query, {limit:2})
             YIELD node,score
-            CALL {
+            CALL (node){
               WITH node
               MATCH (node)-[r:!MENTIONS]->(neighbor)
               RETURN node.id + ' - ' + type(r) + ' -> ' + neighbor.id AS output
@@ -167,9 +170,11 @@ def structured_retriever(question: str) -> str:
         result += "\n".join([el["output"] for el in response])
     return result
 
+## CALL(node) https://neo4j.com/docs/cypher-manual/current/subqueries/call-subquery/
 
-# print(structured_retriever("Who is Octavian?"))
-
+#print(structured_retriever("Who is Octavian?"))
+#kg._driver.close() 
+#exit(0)
 
 # Final retrieval step
 def retriever(question: str):
@@ -251,7 +256,8 @@ res_simple = chain.invoke(
 )
 
 print(f"\n Results === {res_simple}\n\n")
-
+kg._driver.close() 
+exit(0)
 # res_hist = chain.invoke(
 #     {
 #         "question": "When did he become the first emperor?",
@@ -262,3 +268,6 @@ print(f"\n Results === {res_simple}\n\n")
 # )
 
 # print(f"\n === {res_hist}\n\n")
+
+## https://stackoverflow.com/questions/76024415/neomodel-aura-db-exception-ignored-in-function-bolt-del-at-0x7f1fe646
+kg._driver.close() 
